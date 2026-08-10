@@ -12,25 +12,41 @@ function sig(w){return [...w].sort().join('')}
 function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function sample(a,n){return shuffle([...a]).slice(0,n)}
 function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-async function loadDictionary(text=null){
+function loadDictionary(input=null){
   try{
-    if(!text){
-      const r=await fetch('Csw24.txt',{cache:'no-store'});
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      text=await r.text();
+    const source = Array.isArray(input) ? input : (typeof input === 'string' ? input.split(/\r?\n/) : []);
+    state.words = source
+      .map(x => String(x).trim().toUpperCase())
+      .filter(x => /^[A-Z]+$/.test(x));
+
+    state.wordSet = new Set(state.words);
+    state.scoreMap = new Map(state.words.map(w => [w, score(w)]));
+    state.anagramMap = new Map();
+
+    for(const w of state.words){
+      const s = sig(w);
+      if(!state.anagramMap.has(s)) state.anagramMap.set(s, []);
+      state.anagramMap.get(s).push(w);
     }
-    state.words=text.split(/\r?\n/).map(x=>x.trim().toUpperCase()).filter(x=>/^[A-Z]+$/.test(x));
-    state.wordSet=new Set(state.words);
-    state.scoreMap=new Map(state.words.map(w=>[w,score(w)]));
-    state.anagramMap=new Map();
-    for(const w of state.words){const s=sig(w);if(!state.anagramMap.has(s))state.anagramMap.set(s,[]);state.anagramMap.get(s).push(w)}
-    for(const a of state.anagramMap.values())a.sort();
-    document.getElementById('dictStatus').textContent=`CSW24 loaded · ${state.words.length.toLocaleString()} words`;
-    document.getElementById('dictInfo').textContent=`${state.words.length.toLocaleString()} words loaded. Source: Csw24.txt`;
-    fillListLengths(); renderDashboard(); renderLists();
+
+    for(const a of state.anagramMap.values()) a.sort();
+
+    document.getElementById('dictStatus').textContent =
+      `CSW24 loaded · ${state.words.length.toLocaleString()} words`;
+
+    document.getElementById('dictInfo').textContent =
+      `${state.words.length.toLocaleString()} words loaded. Source: csw24.js`;
+
+    fillListLengths();
+    renderDashboard();
+    renderLists();
   }catch(e){
-    document.getElementById('dictStatus').textContent='Dictionary not loaded';
-    document.getElementById('dictInfo').textContent='Could not fetch Csw24.txt. If you opened this HTML directly, run a local server (see README) or use Load another CSW text file below.';
+    console.error('CSW24 load error:', e);
+    state.words = [];
+    state.wordSet = new Set();
+    document.getElementById('dictStatus').textContent = 'Dictionary error';
+    document.getElementById('dictInfo').textContent =
+      'Could not initialize csw24.js. Check the browser console for details.';
   }
 }
 function nav(page){
@@ -208,4 +224,4 @@ async function exportResultsImage(ext){
  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');const cards=[...node.children];canvas.width=1200;canvas.height=Math.max(300,cards.length*90+100);ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--bg')||'#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--text')||'#111';ctx.font='bold 28px system-ui';ctx.fillText('CSW24 Generated Words',40,45);ctx.font='20px system-ui';cards.forEach((c,i)=>{const w=c.querySelector('.word')?.textContent||'';const sc=c.querySelector('.score')?.textContent||'';ctx.fillText(`${w}   ${sc}`,50,90+i*90);const chips=[...c.querySelectorAll('.chip')].map(x=>x.textContent).join(', ');ctx.font='15px system-ui';ctx.fillText(chips.slice(0,100),50,115+i*90);ctx.font='20px system-ui'});const a=document.createElement('a');a.href=canvas.toDataURL(ext==='jpg'?'image/jpeg':'image/png',.95);a.download='csw24-generated.'+(ext==='jpg'?'jpg':'png');a.click()
 }
 window.startQuiz=startQuiz;window.startTyping=startTyping;
-applySettings();loadDictionary();
+applySettings();loadDictionary(CSW24);
